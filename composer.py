@@ -37,17 +37,19 @@ body, cta, send_as, suppression_key, rationale, template_name, template_params (
 
 HARD RUBRIC (judge scores this):
 1) BODY STRUCTURE (exactly 2 short sentences max): Sentence A = one concrete merchant fact from facts JSON (number, ₹ price, locality, metric delta, named offer, batch id, slot time). Sentence B = implication + ONE low-friction CTA (question or YES/NO).
-2) FORBIDDEN in body: “increase sales”, “boost engagement”, “run a campaign today”, “grow your business”, “skyrocket”, “amazing deal”, generic “discount campaign”, hollow “let us help you succeed”.
-3) NO greetings that waste the open line (avoid “Hope you are well”, “Dear merchant”). Start with the anchor fact or name + fact.
-4) NO URLs, http, www. NO claims not supported by facts JSON (no invented competitors, stats, or citations).
-5) If facts.derived has numbers (views, calls, CTR gap, best_live_offer_title, trend query), you MUST use at least one in sentence A.
-6) Match voice.tone; never use voice.taboos.
-7) send_as: use expected_send_as from user JSON exactly.
-8) cta must be one of: open_ended, binary_yes_no, binary_confirm_cancel, multi_choice_slot, none
-9) suppression_key: reuse trigger.suppression_key if present.
-10) Do not plagiarize famous case-study wording; paraphrase structure only.
-11) hi-en code-mix only if language_hint is hi_en_mix (light).
-12) MERCHANT NATURALNESS: write like WhatsApp to a busy owner — never internal or “spec doc” wording.
+2) TRIGGER FIDELITY IS REQUIRED: make the specific trigger and its supplied "why now" fact the main point. Never replace a regulation, recall, wedding, or festival trigger with a generic promotion just because an active offer is available. For regulation_change, name the rule and deadline, then offer a checklist. For recall_due, use the supplied due date and real appointment slots. For festival_upcoming, use the named festival and supplied date/days plus one active offer. For wedding_package_followup, use the wedding countdown and stated next-step window; never invent a slot or claim one is held.
+3) ENGAGEMENT: the reply should unlock a named, immediate next step. Prefer "Reply YES for the 3-point checklist" over a vague "Want help?" If real choices are provided, make the reply effortless (e.g. reply 1 or 2 for the supplied slots). No fake scarcity or unsupported promises.
+4) FORBIDDEN in body: “increase sales”, “boost engagement”, “run a campaign today”, “grow your business”, “skyrocket”, “amazing deal”, generic “discount campaign”, hollow “let us help you succeed”.
+5) NO greetings that waste the open line (avoid “Hope you are well”, “Dear merchant”). Start with the anchor fact or name + fact.
+6) NO URLs, http, www. NO claims not supported by facts JSON (no invented competitors, stats, or citations).
+7) If facts.derived has numbers (views, calls, CTR gap, best_live_offer_title, trend query), use one only when it supports this trigger; do not let a secondary offer displace the trigger fact.
+8) Match voice.tone; never use voice.taboos.
+9) send_as: use expected_send_as from user JSON exactly.
+10) cta must be one of: open_ended, binary_yes_no, binary_confirm_cancel, multi_choice_slot, none
+11) suppression_key: reuse trigger.suppression_key if present.
+12) Do not plagiarize famous case-study wording; paraphrase structure only.
+13) hi-en code-mix only if language_hint is hi_en_mix (light).
+14) MERCHANT NATURALNESS: write like WhatsApp to a busy owner — never internal or “spec doc” wording.
     Forbidden anywhere in body (and close variants): spine, priced off, one block, per chart, on file,
     dispense log, payload, placeholder, merchant_last_message, naked JSON field names, “paste … in one block”.
     If a fact is missing, speak generally (“routine refill from last visit”) — never echo missing-field placeholders.

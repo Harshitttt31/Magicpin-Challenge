@@ -210,17 +210,19 @@ def _tpl_regulation_change(cat, m, tr, c, facts) -> Dict[str, Any]:
                 break
     title = present_text((di or {}).get("title")) or "a compliance update for your listing"
     deadline = present_text(pk.get("deadline_iso")) or present_text(tr.get("expires_at"))
-    dl_bit = f" Target date: {deadline}." if deadline else ""
+    owner = (m.get("identity") or {}).get("owner_first_name") or nm.split(",")[0]
+    title = title.rstrip(".")
+    deadline_bit = f"; review deadline {deadline}" if deadline and deadline not in title else ""
     body = (
-        f"{nm.split(',')[0] if ',' in nm else nm}, regulatory heads-up: {title}.{dl_bit} "
-        f"Want me to outline a short audit checklist? Reply YES."
+        f"{owner}, {title}{deadline_bit}. "
+        "Reply YES for a 3-point checklist to confirm the radiograph requirements."
     )
     return {
         "body": body,
         "cta": "binary_yes_no",
         "send_as": "vera",
         "suppression_key": tr.get("suppression_key") or "",
-        "rationale": "Rule change is dated; Vera helps the owner prep a short audit checklist before the deadline.",
+        "rationale": "Names the regulatory update and deadline, then offers a concise review checklist.",
         "template_name": "vera_compliance_v1",
         "template_params": [nm[:30], title[:60], (deadline or "")[:20]],
     }
@@ -240,30 +242,30 @@ def _tpl_recall_due(cat, m, tr, c, facts) -> Dict[str, Any]:
     slug = m.get("category_slug")
     offers = facts.get("merchant", {}).get("offers_active") or []
     price_line = recall_offer_line(slug, offers)
-    lang = ((c or {}).get("identity") or {}).get("language_pref") or ""
-    hi = "Apke liye " if "hi" in str(lang).lower() else ""
     opening = recall_reminder_phrase(slug)
-    if slot_txt:
-        if hi:
-            slot_part = f"{hi.strip()} — here are two slots that work: {slot_txt}. "
-        else:
-            slot_part = f"Here are two slots that work: {slot_txt}. "
+    due = human_short_date(pk.get("due_date"))
+    due_bit = f" by {due}" if due else ""
+    if len(labels) >= 2:
+        slot_part = f"{labels[0]} (1) and {labels[1]} (2) are open"
+        cta = f"Reply 1 or 2 and we’ll reserve that time for {price_line}."
+        cta_type = "multi_choice_slot"
+    elif labels:
+        slot_part = f"{labels[0]} is open"
+        cta = f"Reply YES to reserve that time for {price_line}."
+        cta_type = "binary_yes_no"
     else:
-        slot_part = (
-            f"{hi.strip()} — reply with a preferred evening; we’ll fit you in. "
-            if hi
-            else "Reply with a preferred evening — we’ll fit you in. "
-        )
-    body = (
-        f"Hi {cust_name}, {biz} here — {opening}. "
-        f"{slot_part}{price_line}. Want me to hold one of these? Reply YES or suggest another time."
-    )
+        slot_part = "we can find an evening that suits you"
+        cta = f"Reply with your preferred evening and we’ll check availability for {price_line}."
+        cta_type = "open_ended"
+    opening = opening.replace(" are due for a visit", " are due")
+    opening = opening.replace(" is due", " is due")
+    body = f"Hi {cust_name}, {opening}{due_bit} at {biz}; {slot_part}. {cta}"
     return {
         "body": body,
-        "cta": "binary_yes_no",
+        "cta": cta_type,
         "send_as": "merchant_on_behalf",
         "suppression_key": tr.get("suppression_key") or "",
-        "rationale": "Scheduled follow-up for this customer; slots and offer match the business type.",
+        "rationale": "Uses the due date, supplied appointment choices, and active category-matched offer.",
         "template_name": "merchant_recall_reminder_v1",
         "template_params": [cust_name, biz, slot_txt or "flexible", price_line],
     }
@@ -333,30 +335,22 @@ def _tpl_festival(cat, m, tr, c, facts) -> Dict[str, Any]:
     nm = _name_merchant(m)
     pk = tr.get("payload") or {}
     fest = present(pk.get("festival"), None) or "the festival season"
+    date_txt = human_short_date(pk.get("date"))
     days_raw = pk.get("days_until")
-    days = present(days_raw, None)
+    days = present(pk.get("days_until"), None)
+    offer = safe_offer_label(m, category_bucket(m.get("category_slug")), facts)
     first = nm.split(",")[0] if "," in nm else nm
-    body = ""
-    if days is not None:
-        try:
-            di = int(days)
-            body = (
-                f"{first}, {fest} is in about {di} days — "
-                f"want a ready-made Google + WhatsApp bundle for your active offers? I can line that up now."
-            )
-        except (TypeError, ValueError):
-            pass
-    if not body:
-        body = (
-            f"{first}, {fest} is coming up — "
-            f"want a ready-made Google + WhatsApp bundle for your active offers? I can line that up now."
-        )
+    timing = f"on {date_txt}" if date_txt else (f"in {days} days" if days is not None else "soon")
+    body = (
+        f"{first}, {fest} is {timing}, and {offer} is active at {m.get('identity', {}).get('name', 'your business')}. "
+        "Reply YES and I’ll draft one Google post and WhatsApp line around it."
+    )
     return {
         "body": body,
-        "cta": "open_ended",
+        "cta": "binary_yes_no",
         "send_as": "vera",
         "suppression_key": tr.get("suppression_key") or "",
-        "rationale": "Festival demand spike ahead; Vera packages posts and WA copy around what’s already live.",
+        "rationale": "Connects the named festival and date to one real offer, with a concrete copy deliverable.",
         "template_name": "vera_festival_v1",
         "template_params": [fest, str(days_raw if days_raw is not None else "")],
     }
@@ -366,30 +360,34 @@ def _tpl_bridal(cat, m, tr, c, facts) -> Dict[str, Any]:
     pk = tr.get("payload") or {}
     nm_c = ((c or {}).get("identity") or {}).get("name") or "there"
     biz = (m.get("identity") or {}).get("name") or "salon"
-    owner = (m.get("identity") or {}).get("owner_first_name") or "Team"
     days = present(pk.get("days_to_wedding"), None)
+    window = present_text(pk.get("next_step_window_open")) or "bridal-prep window"
+    window = window.replace("_", " ")
+    if window == "skin prep program 30day":
+        window = "30-day skin-prep program"
     offers = facts.get("merchant", {}).get("offers_active") or []
     der = _d(facts)
     off = None
     for raw in offers:
-        off = present_text(raw)
-        if off:
+        candidate = present_text(raw)
+        if candidate and any(word in candidate.lower() for word in ("bridal", "spa", "skin", "facial")):
+            off = candidate
             break
     if not off:
-        off = present_text(der.get("best_live_offer_title"))
-    if not off:
-        off = "bridal prep — we’ll tailor the bundle once you pick services"
+        candidate = present_text(der.get("best_live_offer_title"))
+        if candidate and any(word in candidate.lower() for word in ("bridal", "spa", "skin", "facial")):
+            off = candidate
     if days is not None:
         body = (
-            f"Hi {nm_c}, {owner} from {biz} — {days} days to your wedding. "
-            f"Skin-prep window is open; we’re leading with {off}. "
-            f"Want me to hold your preferred Saturday slot?"
+            f"Hi {nm_c}, your wedding is in {days} days and the {window} is open at {biz}"
+            f"{'; ' + off + ' is available' if off else ''}. "
+            f"Reply YES and we’ll send the {window} plan."
         )
     else:
         body = (
-            f"Hi {nm_c}, {owner} from {biz} — wedding prep season is here. "
-            f"We’re pitching {off} with clear inclusions. "
-            f"Want me to hold your preferred Saturday slot?"
+            f"Hi {nm_c}, the wedding-prep window is open at {biz}"
+            f"{'; ' + off + ' is available' if off else ''}. "
+            "Reply YES and we’ll send the next-step prep plan."
         )
     return {
         "body": body,
